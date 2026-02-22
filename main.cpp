@@ -5,7 +5,7 @@
 #include "include/Shaders/shader.h"
 #include <cstddef>
 
-const int MAX_PARTICLES = 1;
+const int MAX_PARTICLES = 10;
 
 struct Particle {
     glm::vec2 position;
@@ -53,7 +53,12 @@ public:
         glBindVertexArray(0);
     }
 
-    void addPoints (std::vector<Particle>& particles) {
+    void updatePoints (std::vector<Particle>& particles, float deltaTime) {
+        // Get the location of the "u_time" variable in your shader
+        for (auto& p : particles) {
+            p.position += p.velocity * deltaTime;
+        }
+        
         // 1. Bind the buffer we already created
         glBindBuffer(GL_ARRAY_BUFFER, this->instanceVBO);
         
@@ -70,23 +75,46 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
 }
 
-// void SpawnParticleLine(std::vector<Particle>& pool, glm::vec2 start, glm::vec2 end, int amount) {
-//     // Find 'amount' dead particles in your pool and move them to these positions
-//     int spawned = 0;
-//     for (auto& p : pool) {
-//         if (p.life <= 0.0f) {
-//             float t = (float)spawned / (float)(amount - 1);
-//             p.position = start + t * (end - start);
-//             p.life = 1.0f;
-//             p.velocity = glm::vec2(0.0f, 0.5f);
-            
-//             spawned++;
-//             if (spawned >= amount) break;
-//         }
-//     }
-// }
+void SpawnParticleLine(std::vector<Particle>& pool, glm::vec2 start, glm::vec2 end, int amount) {
+    // Find 'amount' dead particles in your pool and move them to these positions
+    int spawned = 0;
+    for (auto& p : pool) {
+        float t = (float)spawned / (float)(amount - 1);
+        p.position = start + t * (end - start);
+        p.life = 1.0f;
+        p.velocity = glm::vec2(0.0f, 0.5f);
+        
+        spawned++;
+
+    }
+}
+
+void GiveRandomPositions(std::vector<Particle>& pool) {
+    for (auto& p : pool) {
+        p.position.x = 2.0f * rand()/RAND_MAX - 1.0f;
+        p.position.y = 2.0f * rand()/RAND_MAX - 1.0f;
+    }
+}
+
+void GiveRandomVelocities(std::vector<Particle>& pool) {
+    for (auto& p : pool) {
+        p.velocity.x = 2.0f * rand()/RAND_MAX - 1.0f;
+        p.velocity.y = 2.0f * rand()/RAND_MAX - 1.0f;
+    }
+}
+
+void GiveRandomColors(std::vector<Particle>& pool) {
+    for (auto& p : pool) {
+        p.color.r = 1.0f * rand()/RAND_MAX;
+        p.color.g = 1.0f * rand()/RAND_MAX;
+        p.color.b = 1.0f * rand()/RAND_MAX;
+        p.color.a = 1.0f;
+    }
+}
 
 int main() {
+    srand(static_cast<unsigned int>(time(NULL)));
+
     // 1. Initialize GLFW
     if (!glfwInit()) {
         std::cout << "Failed to initialize GLFW" << std::endl;
@@ -122,25 +150,25 @@ int main() {
 
 
     std::vector<Particle> particles(MAX_PARTICLES);
-    particles[0].position = glm::vec2(0.0f, 0.0f);
-    particles[0].velocity = glm::vec2(0.0f, 0.0f);
-    particles[0].color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-    particles[0].life = 1.0f;
-
-
-
-
+    SpawnParticleLine(particles, glm::vec2(-0.5f, 0.5f), glm::vec2(0.5f, -0.5f), MAX_PARTICLES);
+    GiveRandomPositions(particles);
+    GiveRandomVelocities(particles);
+    GiveRandomColors(particles);
     
     //std::cout << "got here" << std::endl;
+    float lastFrame = 0.0f;
     // 4. The Render Loop!
     while (!glfwWindowShouldClose(window)) {
         // Input: close the window if escape is pressed
         if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
             glfwSetWindowShouldClose(window, true);
         
-        renderer.addPoints(particles);
+        float currentFrame = glfwGetTime();
+        float deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+        renderer.updatePoints(particles, deltaTime);
         // Rendering: Clear the screen to a dark blue color
-        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClearColor(0.3f, 0.2f, 0.5f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
         renderer.shaderPointer->use();
