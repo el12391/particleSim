@@ -6,13 +6,35 @@
 #include <cstddef>
 
 const int MAX_PARTICLES = 10;
+const float LOWER_BOUND = -1.0f;
+const float UPPER_BOUND = 1.0f;
+const float SIDE_SIZE = UPPER_BOUND - LOWER_BOUND;
 
+float step(float boundry, float value) {return value > boundry ? 1.0f : 0.0f;}
+float sign(float value) {return (value > 0.0f) - (value < 0.0f);}
+float linearInterpolation(float x, float y, float a) {return x * (1.0f - a) + y * a;}
 struct Particle {
     glm::vec2 position;
     glm::vec2 velocity;
     glm::vec4 color;
     float life;
 };
+
+void bounceParticle(Particle& particle, float deltaTime) {
+    glm::vec2 futurePosition = particle.position + particle.velocity * deltaTime;
+
+    float outOfBoundsX = step(1.0f, abs(futurePosition.x));
+    float outOfBoundsY = step(1.0f, abs(futurePosition.y));
+
+    glm::vec2 bounceVector = glm::vec2(-sign(futurePosition.x) * abs(particle.velocity.x),
+                                        -sign(futurePosition.y) * abs(particle.velocity.y));
+    glm::vec2 newVelocity = glm::vec2(
+        linearInterpolation(particle.velocity.x, bounceVector.x, outOfBoundsX),
+        linearInterpolation(particle.velocity.y, bounceVector.y, outOfBoundsY));
+    particle.velocity = newVelocity;
+    particle.position = glm::vec2(std::clamp(particle.position.x, LOWER_BOUND, UPPER_BOUND), 
+                    std::clamp(particle.position.y, LOWER_BOUND, UPPER_BOUND));
+}
 
 class Renderer {
 private:
@@ -54,9 +76,15 @@ public:
     }
 
     void updatePoints (std::vector<Particle>& particles, float deltaTime) {
-        // Get the location of the "u_time" variable in your shader
+        
         for (auto& p : particles) {
+            // this calculates the velocity and position of a bouncing particle
+            bounceParticle(p, deltaTime);
+            // if didnt bounce this is the same as before, but these are potentially bounced values
             p.position += p.velocity * deltaTime;
+
+            //std::cout << "velocity: (" << p.velocity.x << ", " << p.velocity.y << ")" << std::endl;
+            //std::cout << "position: (" << p.position.x << ", " << p.position.y << ")" << std::endl;
         }
         
         // 1. Bind the buffer we already created
@@ -91,8 +119,8 @@ void SpawnParticleLine(std::vector<Particle>& pool, glm::vec2 start, glm::vec2 e
 
 void GiveRandomPositions(std::vector<Particle>& pool) {
     for (auto& p : pool) {
-        p.position.x = 2.0f * rand()/RAND_MAX - 1.0f;
-        p.position.y = 2.0f * rand()/RAND_MAX - 1.0f;
+        p.position.x = SIDE_SIZE * rand()/RAND_MAX - UPPER_BOUND;
+        p.position.y = SIDE_SIZE * rand()/RAND_MAX - UPPER_BOUND;
     }
 }
 
@@ -150,7 +178,7 @@ int main() {
 
 
     std::vector<Particle> particles(MAX_PARTICLES);
-    SpawnParticleLine(particles, glm::vec2(-0.5f, 0.5f), glm::vec2(0.5f, -0.5f), MAX_PARTICLES);
+    //SpawnParticleLine(particles, glm::vec2(-1.0f, 1.0f), glm::vec2(1.0f, -1.0f), MAX_PARTICLES);
     GiveRandomPositions(particles);
     GiveRandomVelocities(particles);
     GiveRandomColors(particles);
